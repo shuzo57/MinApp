@@ -1,0 +1,57 @@
+version: "3.9"
+
+services:
+  # --- PostgreSQL コンテナ ---
+  postgres:
+    image: postgres:17
+    container_name: minapp-postgres
+    restart: always
+    env_file:
+      - backend/.env.example
+    environment:
+      - POSTGRES_USER=${DB_USER:-postgres}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres}
+      - POSTGRES_DB=${DB_NAME:-app_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  # --- FastAPI バックエンド ---
+  backend:
+    build: ./backend
+    container_name: minapp-backend
+    depends_on:
+      - postgres
+    env_file:
+      - backend/.env
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      - DB_NAME=${DB_NAME:-app_db}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/app
+    command: >
+      sh -c "uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload"
+
+  # --- React + Vite フロントエンド ---
+  frontend:
+    build: ./frontend
+    container_name: minapp-frontend
+    depends_on:
+      - backend
+    environment:
+      - VITE_API_BASE=http://localhost:8080
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+
+volumes:
+  postgres_data:
