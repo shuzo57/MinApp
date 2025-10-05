@@ -1,9 +1,18 @@
-FROM node:20-alpine
-
+FROM node:22-alpine AS builder
 WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
 COPY . .
 
-RUN npm install && npm run build
+RUN npm run build
+
+# ===== Runtime Stage =====
+FROM node:22-alpine AS runner
+WORKDIR /app
+RUN npm install -g serve
+
+COPY --from=builder /app/dist ./dist
 
 EXPOSE 8080
-CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["serve", "-s", "dist", "-l", "8080"]

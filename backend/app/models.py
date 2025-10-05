@@ -1,7 +1,10 @@
-from pydantic import BaseModel
+from app.db import Base
+from sqlalchemy import Column, Integer, String
 
 
-class Item(BaseModel):
-    id: int
-    name: str
-    description: str | None = None
+class Item(Base):
+    __tablename__ = "items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    description = Column(String, nullable=True)

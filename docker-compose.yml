@@ -5,7 +5,7 @@ services:
     container_name: minapp-postgres
     restart: always
     env_file:
-      - backend/.env.example
+      - backend/.env
     environment:
       - POSTGRES_USER=${DB_USER:-postgres}
       - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres}
@@ -14,13 +14,19 @@ services:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    healthcheck:                     # ★ DB起動完了を確認してから backend を動かす
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-app_db}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   # --- FastAPI バックエンド ---
   backend:
     build: ./backend
     container_name: minapp-backend
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy   # ★ PostgreSQL の healthcheck 成功を待機
     env_file:
       - backend/.env
     environment:
@@ -38,7 +44,9 @@ services:
 
   # --- React + Vite フロントエンド ---
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: ${FRONT_DOCKERFILE:-Dockerfile.dev}   # ← dev / prod 切替可能
     container_name: minapp-frontend
     depends_on:
       - backend
@@ -48,8 +56,9 @@ services:
       - ./frontend:/app
       - /app/node_modules
     ports:
-      - "5173:5173"
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+      - "${FRONT_PORT:-5173}:${FRONT_PORT:-5173}"       # ← ポートも切替可能
+    command: >
+      sh -c "npm install && npm run ${FRONT_CMD:-dev} -- --host 0.0.0.0"
 
 volumes:
   postgres_data:
