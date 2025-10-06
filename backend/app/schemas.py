@@ -1,6 +1,6 @@
 # app/schemas.py
 from pydantic import BaseModel
-
+from datetime import datetime
 
 class ItemBase(BaseModel):
     name: str
@@ -16,3 +16,24 @@ class Item(ItemBase):
 
     class Config:
         from_attributes = True
+
+class GeminiPrompt(BaseModel):
+    prompt: str
+
+class GeminiResponse(BaseModel):
+    response: str
+
+class GcsFile(BaseModel):
+    name: str
+    updated: datetime
+    size: int
+    path: str
+
+class GcsFilePath(BaseModel):
+    path: str
+
+class GcsFileUrl(BaseModel):
+    url: str
+
+class FileContent(BaseModel):
+    content: str
