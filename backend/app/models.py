@@ -1,3 +1,4 @@
+# app/models.py
 from app.db import Base
 from sqlalchemy import Column, Integer, String
 
@@ -8,3 +9,5 @@ class Item(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     description = Column(String, nullable=True)
+    owner_uid = Column(String, nullable=False, index=True)   # Firebase UID
+    owner_email = Column(String, nullable=False)              # 表示用

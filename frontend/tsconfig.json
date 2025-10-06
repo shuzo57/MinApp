@@ -23,6 +23,6 @@
     "include": [
         "src",
         "vite-env.d.ts",
-        "index.tsx"
+        "src/index.tsx"
     ]
 }

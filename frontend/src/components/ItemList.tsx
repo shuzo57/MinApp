@@ -1,50 +1,45 @@
 import { useEffect, useState } from "react";
-import ReactDOM from "react-dom/client";
+import { apiFetch } from "../auth/client";
 
-// --- 型定義 ---
 interface Item {
     id: number;
     name: string;
     description?: string;
 }
 
-// --- メインアプリ ---
-function App() {
+export default function ItemList() {
     const [items, setItems] = useState<Item[]>([]);
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [loading, setLoading] = useState(false);
 
-    const apiBase = import.meta.env.VITE_API_BASE || "http://localhost:8080";
-
     // --- 一覧取得 ---
     const fetchItems = async () => {
         try {
-            const res = await fetch(`${apiBase}/api/items`);
-            if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`);
-            const data = await res.json();
-            setItems(data);
-        } catch (err) {
-            console.error("Error fetching items:", err);
+            const res = await apiFetch("/items");
+            if (!res.ok) throw new Error(`Failed: ${res.status}`);
+            setItems(await res.json());
+        } catch (e) {
+            console.error("Fetch error:", e);
         }
     };
 
-    // --- 登録処理 ---
+    // --- 登録 ---
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         try {
-            const res = await fetch(`${apiBase}/api/items`, {
+            const res = await apiFetch("/items", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ name, description }),
             });
-            if (!res.ok) throw new Error(`Failed to post: ${res.status}`);
+            if (!res.ok) throw new Error(`Failed: ${res.status}`);
             setName("");
             setDescription("");
             await fetchItems();
-        } catch (err) {
-            console.error("Error creating item:", err);
+        } catch (e) {
+            console.error("Create error:", e);
         } finally {
             setLoading(false);
         }
@@ -55,9 +50,7 @@ function App() {
     }, []);
 
     return (
-        <main style={{ fontFamily: "sans-serif", textAlign: "center", marginTop: "2rem" }}>
-            <h1>MinApp Items</h1>
-
+        <>
             <form onSubmit={handleSubmit} style={{ marginBottom: "2rem" }}>
                 <input
                     placeholder="Item name"
@@ -89,8 +82,6 @@ function App() {
                     ))}
                 </ul>
             )}
-        </main>
+        </>
     );
 }
-
-ReactDOM.createRoot(document.getElementById("root")!).render(<App />);
