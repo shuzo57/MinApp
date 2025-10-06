@@ -6,3 +6,9 @@ sqlalchemy
 alembic
 google-auth
 requests
+google-cloud-aiplatform
+google-genai
+google-cloud-secret-manager
+google-cloud-storage
+python-multipart
+python-pptx

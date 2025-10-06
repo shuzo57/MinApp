@@ -4,6 +4,8 @@ import { apiFetch } from "./auth/client";
 import { auth } from "./auth/firebase";
 import ItemList from "./components/ItemList";
 import LoginButton from "./components/LoginButton";
+import GeminiChat from "./components/GeminiChat"; // GeminiChatをインポート
+import FileManager from "./components/FileManager"; // FileManagerをインポート
 
 interface User {
     uid: string;
@@ -73,6 +75,8 @@ export default function App() {
                 <>
                     <p>こんにちは、{user.email}</p>
                     <ItemList />
+                    <FileManager /> {/* ファイル管理コンポーネントを追加 */}
+                    <GeminiChat /> {/* GeminiChatコンポーネントを追加 */}
                 </>
             )}
         </main>

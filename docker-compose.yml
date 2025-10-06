@@ -30,6 +30,7 @@ services:
     env_file:
       - backend/.env
     environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/app/gcp-key.json  # ★ GCP認証キーの絶対パス（コンテナ内）
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USER=${DB_USER:-postgres}
@@ -38,7 +39,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./backend:/app
+      - ./backend:/app               # backendディレクトリをコンテナの/appにマウント
     command: >
       sh -c "uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload"
 
@@ -51,7 +52,7 @@ services:
     depends_on:
       - backend
     environment:
-      - VITE_API_BASE=http://localhost:8080
+      - VITE_API_BASE=http://localhost:8080/api
     volumes:
       - ./frontend:/app
       - /app/node_modules
