@@ -1,3 +1,4 @@
+# app/schemas.py
 from pydantic import BaseModel
 
 
@@ -10,6 +11,8 @@ class ItemCreate(ItemBase):
 
 class Item(ItemBase):
     id: int
+    owner_uid: str
+    owner_email: str
 
     class Config:
         from_attributes = True
