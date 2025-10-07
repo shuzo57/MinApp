@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => {
             proxy: isDev
                 ? {
                     "/api": {
-                        target: env.VITE_API_BASE || "http://backend:8080",
+                        target: env.VITE_API_BASE || "http://localhost:8080",
                         changeOrigin: true,
                     },
                 }
