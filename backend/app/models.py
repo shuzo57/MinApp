@@ -1,19 +1,15 @@
-from app.db import Base
-from sqlalchemy import (JSON, Column, DateTime, ForeignKey, Integer, String,
-                        Text, UniqueConstraint, func)
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from datetime import datetime
+from typing import Any
 
-
-class Base(DeclarativeBase):
-    pass
+from app.db import Base  # app.db の Base を唯一の Base として使う
+from sqlalchemy import (JSON, DateTime, ForeignKey, Integer, String, Text,
+                        UniqueConstraint, func)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
 class File(Base):
     __tablename__ = "files"
-    __table_args__ = (
-        # 同一ユーザーが同一内容(sha256)のファイルを重複登録しないための制約（任意）
-        UniqueConstraint("user_id", "sha256", name="uq_files_user_sha256"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "sha256", name="uq_files_user_sha256"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[str] = mapped_column(String, nullable=False, index=True)  # Firebase UID
@@ -21,7 +17,7 @@ class File(Base):
     path: Mapped[str] = mapped_column(String, nullable=False)
     sha256: Mapped[str] = mapped_column(String, nullable=False)
     size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
-    created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     analyses: Mapped[list["Analysis"]] = relationship(
         back_populates="file",
@@ -35,16 +31,13 @@ class Analysis(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[str] = mapped_column(String, nullable=False, index=True)  # Firebase UID
-    file_id: Mapped[int] = mapped_column(
-        ForeignKey("files.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
+    file_id: Mapped[int] = mapped_column(ForeignKey("files.id", ondelete="CASCADE"), nullable=False, index=True)
     status: Mapped[str] = mapped_column(String, default="succeeded")
     model: Mapped[str] = mapped_column(String, nullable=False)
     rules_version: Mapped[str | None] = mapped_column(String, nullable=True)
-    result_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[str] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # LLMの結果は list になることが多いので Any にしておくと安全
+    result_json: Mapped[Any | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     file: Mapped["File"] = relationship(back_populates="analyses")
     items: Mapped[list["AnalysisItemRow"]] = relationship(
@@ -58,11 +51,7 @@ class AnalysisItemRow(Base):
     __tablename__ = "analysis_items"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    analysis_id: Mapped[int] = mapped_column(
-        ForeignKey("analyses.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
+    analysis_id: Mapped[int] = mapped_column(ForeignKey("analyses.id", ondelete="CASCADE"), nullable=False, index=True)
     slide_number: Mapped[int] = mapped_column(Integer, nullable=False)
     category: Mapped[str] = mapped_column(String, nullable=False)
     basis: Mapped[str] = mapped_column(Text, nullable=False)
@@ -71,12 +60,13 @@ class AnalysisItemRow(Base):
     correction_type: Mapped[str | None] = mapped_column(String, nullable=True)
 
     analysis: Mapped["Analysis"] = relationship(back_populates="items")
-    
+
+
 class Item(Base):
     __tablename__ = "items"
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)
-    description = Column(String, nullable=True)
-    owner_uid = Column(String, nullable=False, index=True)   # Firebase UID
-    owner_email = Column(String, nullable=False)  
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    owner_uid: Mapped[str] = mapped_column(String, nullable=False, index=True)  # Firebase UID
+    owner_email: Mapped[str | None] = mapped_column(String, nullable=True)     # ← None も許容
