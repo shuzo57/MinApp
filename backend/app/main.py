@@ -139,8 +139,7 @@ app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
+        "*",  # 本番では特定のオリジンに限定することを推奨
     ],
     allow_credentials=True,   # Firebase の Authorization を送るなら True のまま
     allow_methods=["*"],      # POST/DELETE/OPTIONS 含めて全許可
