@@ -60,13 +60,3 @@ class AnalysisItemRow(Base):
     correction_type: Mapped[str | None] = mapped_column(String, nullable=True)
 
     analysis: Mapped["Analysis"] = relationship(back_populates="items")
-
-
-class Item(Base):
-    __tablename__ = "items"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String, nullable=False)
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    owner_uid: Mapped[str] = mapped_column(String, nullable=False, index=True)  # Firebase UID
-    owner_email: Mapped[str | None] = mapped_column(String, nullable=True)     # ← None も許容
