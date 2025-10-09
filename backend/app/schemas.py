@@ -72,13 +72,6 @@ class AnalysisRead(AnalysisBase):
     createdAt: str = Field(serialization_alias="createdAt")
     items: List[AnalysisItem] = []
 
-
-class GeminiPrompt(BaseModel):
-    prompt: str
-
-class GeminiResponse(BaseModel):
-    response: str
-
 class GcsFile(BaseModel):
     name: str
     updated: datetime
@@ -93,18 +86,3 @@ class GcsFileUrl(BaseModel):
 
 class FileContent(BaseModel):
     content: str
-
-class ItemBase(BaseModel):
-    name: str
-    description: str | None = None
-
-class ItemCreate(ItemBase):
-    pass
-
-class Item(ItemBase):
-    id: int
-    owner_uid: str
-    owner_email: str
-
-    class Config:
-        from_attributes = True

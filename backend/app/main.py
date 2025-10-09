@@ -5,6 +5,9 @@ import os
 import time
 from contextlib import asynccontextmanager
 from typing import List, Optional
+from fastapi.responses import StreamingResponse
+import openpyxl
+from openpyxl.styles import Alignment, Font, PatternFill
 
 from app import models, schemas
 from app.analysis import analyze_xml  # ← app.schemas に正規化して返す実装に統一
@@ -139,13 +142,17 @@ app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "*",  # 本番では特定のオリジンに限定することを推奨
+        # あなたの公開サイトからのアクセスを許可
+        "https://storage.googleapis.com/minapp-frontend-bucket-474213", 
+        
+        # あなたのパソコンでの開発・テストからのアクセスを許可
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
     ],
-    allow_credentials=True,   # Firebase の Authorization を送るなら True のまま
-    allow_methods=["*"],      # POST/DELETE/OPTIONS 含めて全許可
-    allow_headers=["*"],      # ブラウザが送る小文字の header 名も含めて許可
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
-
 
 
 # =========================
@@ -187,27 +194,6 @@ def health_deep(db: Session = Depends(get_db)):
         gcs_ok = False
     status = "ok" if (db_ok and gcs_ok) else "degraded"
     return {"status": status, "db": db_ok, "gcs": gcs_ok}
-
-
-# =========================
-# Gemini: prompt -> text
-# =========================
-@app.post("/api/generate", response_model=schemas.GeminiResponse)
-def generate_text(prompt_data: schemas.GeminiPrompt, user=Depends(get_current_user)):
-    project_id = os.getenv("GOOGLE_PROJECT_ID")
-    if not project_id:
-        raise HTTPException(status_code=500, detail="GOOGLE_PROJECT_ID not set.")
-    try:
-        api_key = access_secret_version(project_id=project_id, secret_id="API_KEY")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Secret fetch failed: {e}")
-
-    client = genai.Client(vertexai=True, api_key=api_key)
-    try:
-        resp = client.models.generate_content(model="gemini-2.5-flash-lite", contents=prompt_data.prompt)
-        return {"response": resp.text or "No response text found."}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 # =========================
@@ -631,34 +617,77 @@ def delete_analysis_item_api(
     db.commit()
     return {"ok": True}
 
-
 # =========================
-
+# Excel Export (追加)
 # =========================
-# Items (DB) - Firebase UID で所有制御
-# =========================
-@app.get("/api/items", response_model=List[schemas.Item])
-def get_items(db: Session = Depends(get_db), user=Depends(get_current_user)):
-    return db.query(models.Item).filter(models.Item.owner_uid == user["uid"]).all()
+@app.get("/api/export/analysis/{analysis_id}/excel")
+def export_analysis_to_excel(
+    analysis_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
+):
+    analysis, items = get_analysis_with_items(db, analysis_id)
+    if not analysis or analysis.user_id != user["uid"]:
+        raise HTTPException(status_code=404, detail="Analysis not found")
 
-@app.post("/api/items", response_model=schemas.Item)
-def create_item(item: schemas.ItemCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    db_item = models.Item(
-        name=item.name,
-        description=item.description,
-        owner_uid=user["uid"],
-        owner_email=user.get("email"),
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = "AnalysisResults"
+
+    # ヘッダー行を書き込み
+    headers = ["スライド番号", "カテゴリ", "根拠", "指摘事項", "改善案", "修正の種類"]
+    sheet.append(headers)
+
+    # ヘッダーのスタイリング
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
+    for cell in sheet[1]:
+        cell.font = header_font
+        cell.fill = header_fill
+
+    # データ行を書き込み & スタイリング
+    wrap_alignment = Alignment(wrap_text=True, vertical='top')
+    required_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+
+    for item in items:
+        row_data = [
+            item.slide_number,
+            item.category,
+            item.basis,
+            item.issue,
+            item.suggestion,
+            item.correction_type
+        ]
+        sheet.append(row_data)
+        
+        # 「必須」の行に色を付ける
+        if item.correction_type == "必須":
+            for cell in sheet[sheet.max_row]:
+                cell.fill = required_fill
+    
+    # 全てのデータセルにテキスト折り返しを設定
+    for row in sheet.iter_rows(min_row=2):
+        for cell in row:
+            cell.alignment = wrap_alignment
+
+    # 列幅の調整
+    sheet.column_dimensions['A'].width = 12  # スライド番号
+    sheet.column_dimensions['B'].width = 15  # カテゴリ
+    sheet.column_dimensions['C'].width = 40  # 根拠
+    sheet.column_dimensions['D'].width = 60  # 指摘事項
+    sheet.column_dimensions['E'].width = 60  # 改善案
+    sheet.column_dimensions['F'].width = 12  # 修正の種類
+
+    excel_stream = io.BytesIO()
+    workbook.save(excel_stream)
+    excel_stream.seek(0)
+
+    file_name = f"analysis_{analysis_id}.xlsx"
+    headers = {
+        'Content-Disposition': f'attachment; filename="{file_name}"'
+    }
+    return StreamingResponse(
+        excel_stream,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers=headers
     )
-    db.add(db_item)
-    db.commit()
-    db.refresh(db_item)
-    return db_item
-
-@app.get("/api/items/{item_id}", response_model=schemas.Item)
-def get_item(item_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    row = db.query(models.Item).filter(models.Item.id == item_id).first()
-    if not row:
-        raise HTTPException(status_code=404, detail="Item not found")
-    if row.owner_uid != user["uid"]:
-        raise HTTPException(status_code=403, detail="Access denied")
-    return row

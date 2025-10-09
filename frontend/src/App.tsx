@@ -1,75 +1,49 @@
-// src/App.tsx
-import { onAuthStateChanged } from "firebase/auth";
-import { useEffect, useState } from "react";
-import { apiFetch } from "./auth/client";
+import { onAuthStateChanged, signOut, User } from "firebase/auth";
+import React, { useEffect, useState } from "react";
 import { auth } from "./auth/firebase";
-import FileManager from "./components/FileManager";
-import GeminiChat from "./components/GeminiChat";
-import ItemList from "./components/ItemList";
-import LoginButton from "./components/LoginButton";
-import PptxAnalyzer from "./components/PptxAnalyzer"; // ← 追加
+import LoginScreen from "./components/LoginScreen";
+import MainApp from "./components/MainApp";
+import Spinner from "./components/Spinner";
 
-interface User {
-    uid: string;
-    email: string;
-    verified: boolean;
-}
+const App: React.FC = () => {
+  const [user, setUser] = useState<User | null>(auth.currentUser);
+  const [loading, setLoading] = useState(true);
 
-export default function App() {
-    const [user, setUser] = useState<User | null>(null);
-    const [checkingAuth, setCheckingAuth] = useState(true);
-    const [loadingUserData, setLoadingUserData] = useState(false);
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser);
+      setLoading(false);
+    });
+    // クリーンアップ関数
+    return () => unsubscribe();
+  }, []);
 
-    useEffect(() => {
-        const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
-            if (!firebaseUser) {
-                setUser(null);
-                setCheckingAuth(false);
-                return;
-            }
-            setLoadingUserData(true);
-            try {
-                const res = await apiFetch("/me");
-                if (res.ok) setUser(await res.json());
-                else setUser(null);
-            } catch (err) {
-                console.error("Failed to fetch /me:", err);
-                setUser(null);
-            } finally {
-                setLoadingUserData(false);
-                setCheckingAuth(false);
-            }
-        });
-        return () => unsub();
-    }, []);
-
-    if (checkingAuth) return <p>Loading authentication...</p>;
-
-    if (!user) {
-        return (
-            <main style={{ fontFamily: "sans-serif", textAlign: "center", marginTop: "2rem" }}>
-                <h1>MinApp</h1>
-                <LoginButton />
-                <p style={{ color: "#666" }}>ログインしてください</p>
-            </main>
-        );
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Logout failed:", error);
     }
+  };
 
+  if (loading) {
     return (
-        <main style={{ fontFamily: "sans-serif", textAlign: "center", marginTop: "2rem" }}>
-            <h1>MinApp</h1>
-            <LoginButton />
-            {loadingUserData ? (
-                <p>Loading user data...</p>
-            ) : (
-                <>
-                    <p>こんにちは、{user.email}</p>
-                    <ItemList />
-                    <FileManager />
-                    <PptxAnalyzer /> {/* ← ここで解析UIを追加 */}
-                    <GeminiChat />
-                </>
-            )}
-        </main>
+      <div className="flex items-center justify-center min-h-screen bg-slate-100">
+        <Spinner />
+        <p className="ml-4 text-lg text-gray-600">認証情報を確認中...</p>
+      </div>
     );
-}
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-100 font-sans">
+      {user ? (
+        <MainApp user={user} onLogout={handleLogout} />
+      ) : (
+        <LoginScreen />
+      )}
+    </div>
+  );
+};
+
+export default App;
